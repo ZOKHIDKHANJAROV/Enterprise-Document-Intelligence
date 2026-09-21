@@ -8,7 +8,7 @@ quantization:
   double_quant: true
 
 lora:
-  # PEFT supports "all-linear" for QLoRA-style adaptation.
+  # PEFT supports all-linear for QLoRA-style adaptation.
   r: 16
   alpha: 32
   dropout: 0.05
