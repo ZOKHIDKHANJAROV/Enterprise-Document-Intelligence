@@ -1,17 +1,20 @@
-# Data
+# Enterprise data
 data/raw/
 data/extracted/
-data/dataset/
+data/dataset/*.jsonl
+data/dataset/*.json
+data/dataset/*.parquet
 *.pdf
 *.docx
 *.doc
 *.xlsx
 *.xls
+*.xlsm
 *.pptx
 *.ppt
 *.zip
 
-# Models / checkpoints
+# Model weights and adapters
 models/
 *.safetensors
 *.bin
@@ -22,32 +25,27 @@ models/
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .ipynb_checkpoints/
 
-# Environments
+# Environments and secrets
 .venv/
 venv/
 env/
 .env
 
-# IDE
+# IDE / OS
 .vscode/
 .idea/
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log
 
 # Experiment outputs
 outputs/
 runs/
 mlruns/
 wandb/
+evaluation/*.json
+evaluation/*.jsonl
