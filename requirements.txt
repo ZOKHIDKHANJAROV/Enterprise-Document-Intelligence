@@ -1,0 +1,24 @@
+# Core ML
+torch
+transformers
+datasets
+peft
+trl
+accelerate
+bitsandbytes
+
+# Data / document processing
+pypdf
+python-docx
+openpyxl
+pandas
+tqdm
+
+# Utilities
+pyyaml
+sentencepiece
+protobuf
+
+# Evaluation / development
+scikit-learn
+pytest
