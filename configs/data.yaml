@@ -1,0 +1,13 @@
+# Paths are relative to the repository root.
+raw_dir: "data/raw"
+extracted_dir: "data/extracted"
+dataset_dir: "data/dataset"
+
+# Initial controlled experiment.
+max_documents: 500
+seed: 42
+
+# Dataset split is done by document_id to prevent document-level leakage.
+train_ratio: 0.90
+validation_ratio: 0.05
+test_ratio: 0.05
