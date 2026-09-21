@@ -13,11 +13,8 @@ python-docx
 openpyxl
 pandas
 tqdm
-
-# Utilities
 pyyaml
-sentencepiece
-protobuf
+requests
 
 # Evaluation / development
 scikit-learn
