@@ -1,10 +1,13 @@
-.PHONY: gpu extract qa validate split format train chat predict evaluate
+.PHONY: gpu extract inspect qa validate split format train chat predict evaluate
 
 gpu:
 	python scripts/check_gpu.py
 
 extract:
-	python scripts/extract_documents.py --input-dir data/raw/documents --output data/extracted/corpus.jsonl --max-documents 500
+	python scripts/extract_documents.py --input-dir data/raw/documents --output data/extracted/corpus.jsonl --max-documents 500 --ocr
+
+inspect:
+	python scripts/inspect_corpus.py --input data/extracted/corpus.jsonl
 
 qa:
 	python scripts/generate_qa_dataset.py --input data/extracted/corpus.jsonl --output data/dataset/qa_raw.jsonl --base-url http://localhost:8000/v1 --model mistral --max-documents 500
