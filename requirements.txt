@@ -10,11 +10,18 @@ bitsandbytes
 # Data / document processing
 pypdf
 python-docx
+python-pptx
 openpyxl
 pandas
+xlrd
 tqdm
 pyyaml
 requests
+
+# Optional OCR for scanned PDFs
+pymupdf
+pytesseract
+Pillow
 
 # Evaluation / development
 scikit-learn
