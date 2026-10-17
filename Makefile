@@ -3,9 +3,15 @@ CONFIG ?= configs/qlora.yaml
 RUN ?= qwen3-4b
 EVAL_DIR = evaluation/$(RUN)
 
-# OpenAI-compatible endpoint (e.g. vLLM) used to generate QA pairs.
-QA_URL ?= http://localhost:8000/v1
-QA_MODEL ?= Qwen/Qwen3-4B-Instruct-2507
+# Source documents, one folder per document type.
+DOCS_DIR ?= data/raw/documents
+# Sampling for the controlled experiment; quality filter drops broken text layers.
+EXTRACT_FLAGS ?= --min-text-chars 300 --min-quality 0.55
+
+# OpenAI-compatible endpoint used to generate QA pairs. Default: Ollama with
+# qwen3-4b-qa (see README: qwen3:4b-instruct with num_ctx 8192).
+QA_URL ?= http://localhost:11434/v1
+QA_MODEL ?= qwen3-4b-qa
 
 # RAG: index over INDEX_CORPUS (use corpus_full.jsonl from make extract-full for the whole corpus).
 INDEX_CORPUS ?= data/extracted/corpus.jsonl
@@ -22,7 +28,7 @@ gpu:
 	python scripts/check_gpu.py
 
 extract:
-	python scripts/extract_documents.py --input-dir data/raw/documents --output data/extracted/corpus.jsonl --max-documents 500 --ocr
+	python scripts/extract_documents.py --input-dir $(DOCS_DIR) --output data/extracted/corpus.jsonl --max-documents 500 --max-per-folder 120 $(EXTRACT_FLAGS)
 
 inspect:
 	python scripts/inspect_corpus.py --input data/extracted/corpus.jsonl
@@ -74,7 +80,7 @@ judge:
 	python scripts/judge_predictions.py --predictions $(EVAL_DIR)/predictions.jsonl --output $(EVAL_DIR)/judge.json --base-url $(JUDGE_URL) --model $(JUDGE_MODEL)
 
 extract-full:
-	python scripts/extract_documents.py --input-dir data/raw/documents --output data/extracted/corpus_full.jsonl --ocr
+	python scripts/extract_documents.py --input-dir $(DOCS_DIR) --output data/extracted/corpus_full.jsonl $(EXTRACT_FLAGS)
 
 index:
 	python scripts/rag_retrieval.py --corpus $(INDEX_CORPUS) --output-dir $(INDEX_DIR)

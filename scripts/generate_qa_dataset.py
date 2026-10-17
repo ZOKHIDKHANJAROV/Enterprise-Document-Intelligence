@@ -9,8 +9,19 @@ from tqdm import tqdm
 SYSTEM_PROMPT = '''Ты готовишь QA-датасет для корпоративного AI-ассистента.
 Используй только факты из документа. Не выдумывай. Создай вопросы разных
 типов: факты, обязанности, сроки, ограничения, процедуры и краткое содержание.
+Не начинай вопрос с названия типа (не пиши "Факт:", "Процедура:" и т. п.).
+Пиши вопрос и ответ на том же языке, что и документ (русском или узбекском),
+не переводи. Числа, даты, номера и названия копируй из документа дословно.
 Верни только JSON-массив объектов с полями instruction, input, output.
-В поле input дословно скопируй фрагмент документа, на котором основан ответ.'''
+В поле input дословно скопируй фрагмент документа (2–5 предложений), на
+котором основан ответ.'''
+
+# Fragments shorter than this (e.g. just a document number) are not useful
+# training context; the surrounding document chunk is used instead.
+MIN_FRAGMENT_CHARS = 200
+CATEGORY_PREFIX = re.compile(
+    r'^(?:факт\w*|обязанност\w*|срок\w*|ограничени\w*|процедур\w*|краткое содержание|резюме|summary)\s*[:.\-–—]\s*',
+    re.IGNORECASE)
 
 # Matches the context budget used by format_sft_dataset.py.
 DEFAULT_CONTEXT_CHARS = 1800
@@ -22,6 +33,9 @@ DOCUMENT_TYPES = [
     ('Служебная записка', r'служебн\w*\s+записк'),
     ('Докладная записка', r'докладн\w*\s+записк'),
     ('Пояснительная записка', r'пояснительн\w*\s+записк'),
+    ('Штатное расписание', r'штатн\w*\s+расписани'),
+    ('Организационно-технические мероприятия', r'организационно[-\s]+техническ'),
+    ('Нормативный документ', r'нормативн'),
     ('Приказ', r'приказ'),
     ('Распоряжение', r'распоряжени'),
     ('Постановление', r'постановлени'),
@@ -38,30 +52,43 @@ DOCUMENT_TYPES = [
     ('Заявление', r'заявлени'),
     ('Доверенность', r'доверенност'),
     ('Письмо', r'письм'),
+    ('Калькуляция', r'калькуляци'),
+    ('Смета', r'смет[аыеу]?(?!\w)'),
+    ('Лимит', r'лимит'),
+    ('Лицензия', r'лицензи'),
+    ('План', r'план(?:ы|а|е)?(?!\w)'),
+    ('Показатели', r'показател'),
+    ('Политика', r'политик'),
+    ('Правила', r'правил[аео]?(?!\w)'),
+    ('Стандарт', r'стандарт'),
+    ('Рапорт', r'рапорт'),
+    ('Проект', r'проект'),
 ]
 TYPE_HEAD_CHARS = 600
+# Draft stamps ("ПРОЕКТ") precede the real type in headings; trust only folders.
+FOLDER_ONLY_TYPES = {'Проект'}
 
 
 def detect_document_type(text, relative_path=None):
-    """Type from the document heading; fall back to folder names, then 'unknown'.
+    """Type from the folder name (e.g. "Приказы/..."), else from the heading, else 'unknown'.
 
-    The earliest type word in the heading wins, so "ПРИКАЗ ... Об утверждении
-    Положения" is a Приказ.
+    Folders are curated by type, so they win. In the heading the earliest type
+    word wins, so "ПРИКАЗ ... Об утверждении Положения" is a Приказ.
     """
-    head = (text or '')[:TYPE_HEAD_CHARS].lower()
-    best = None
-    for name, pattern in DOCUMENT_TYPES:
-        match = re.search(r'(?<!\w)' + pattern, head)
-        if match and (best is None or match.start() < best[0]):
-            best = (match.start(), name)
-    if best:
-        return best[1]
     if relative_path:
         for part in reversed(Path(relative_path).parts[:-1]):
             for name, pattern in DOCUMENT_TYPES:
                 if re.match(pattern, part.lower()):
                     return name
-    return 'unknown'
+    head = (text or '')[:TYPE_HEAD_CHARS].lower()
+    best = None
+    for name, pattern in DOCUMENT_TYPES:
+        if name in FOLDER_ONLY_TYPES:
+            continue
+        match = re.search(r'(?<!\w)' + pattern, head)
+        if match and (best is None or match.start() < best[0]):
+            best = (match.start(), name)
+    return best[1] if best else 'unknown'
 
 
 def normalize(text):
@@ -110,11 +137,12 @@ def select_context(document_text, fragment, question, answer, size=DEFAULT_CONTE
     otherwise the document chunk that best matches the question and answer.
     """
     fragment = (fragment or '').strip()
-    if fragment and len(fragment) <= size and normalize(fragment) in normalize(document_text):
+    real_fragment = bool(fragment) and normalize(fragment) in normalize(document_text)
+    if real_fragment and MIN_FRAGMENT_CHARS <= len(fragment) <= size:
         return fragment
     if len(document_text) <= size:
         return document_text
-    target = stems(question) | stems(answer)
+    target = stems(question) | stems(answer) | (stems(fragment) if real_fragment else set())
     return max(split_chunks(document_text, size), key=lambda chunk: len(target & stems(chunk)))
 
 
@@ -140,7 +168,7 @@ def build_examples(document, raw_examples, context_chars, min_grounding, stats):
     for example in raw_examples:
         if not isinstance(example, dict):
             continue
-        instruction = str(example.get('instruction', '')).strip()
+        instruction = CATEGORY_PREFIX.sub('', str(example.get('instruction', '')).strip())
         output = str(example.get('output', '')).strip()
         if not instruction or not output:
             stats['empty'] += 1
@@ -162,24 +190,35 @@ def build_examples(document, raw_examples, context_chars, min_grounding, stats):
 
 
 def parse_json(text):
-    text = text.strip()
+    # Reasoning models (Qwen3 hybrid) may prepend a <think> block.
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
     if text.startswith('```'):
         text = re.sub(r'^```(?:json)?\s*', '', text)
         text = re.sub(r'\s*```$', '', text)
     start, end = text.find('['), text.rfind(']')
     if start < 0 or end <= start:
         raise ValueError('No JSON array in model response')
-    result = json.loads(text[start:end + 1])
+    payload = text[start:end + 1]
+    try:
+        result = json.loads(payload)
+    except json.JSONDecodeError:
+        # Models copy backslashes from documents ("\e", "\G"); escape invalid ones.
+        result = json.loads(re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', payload))
     if not isinstance(result, list):
         raise ValueError('Expected JSON array')
     return result
 
 
-def generate(base_url, model, document_text, count, timeout):
-    prompt = f'Создай {count} QA-примеров для документа.\n\nDOCUMENT:\n{document_text}'
-    response = requests.post(f"{base_url.rstrip('/')}/chat/completions", headers={'Content-Type': 'application/json'}, json={'model': model, 'temperature': 0.2, 'messages': [{'role': 'system', 'content': SYSTEM_PROMPT}, {'role': 'user', 'content': prompt}]}, timeout=timeout)
-    response.raise_for_status()
-    return parse_json(response.json()['choices'][0]['message']['content'])
+def generate(base_url, model, document_text, count, timeout, retries=2):
+    """On a context-size error (dense tables tokenize poorly) retry with half the text."""
+    for attempt in range(retries + 1):
+        prompt = f'Создай {count} QA-примеров для документа.\n\nDOCUMENT:\n{document_text}'
+        response = requests.post(f"{base_url.rstrip('/')}/chat/completions", headers={'Content-Type': 'application/json'}, json={'model': model, 'temperature': 0.2, 'messages': [{'role': 'system', 'content': SYSTEM_PROMPT}, {'role': 'user', 'content': prompt}]}, timeout=timeout)
+        if response.status_code == 400 and 'context' in response.text and attempt < retries:
+            document_text = document_text[:len(document_text) // 2]
+            continue
+        response.raise_for_status()
+        return parse_json(response.json()['choices'][0]['message']['content'])
 
 
 def main():
@@ -190,7 +229,7 @@ def main():
     parser.add_argument('--model', required=True)
     parser.add_argument('--questions-per-document', type=int, default=5)
     parser.add_argument('--max-documents', type=int, default=500)
-    parser.add_argument('--max-chars', type=int, default=24000)
+    parser.add_argument('--max-chars', type=int, default=10000)
     parser.add_argument('--timeout', type=int, default=300)
     parser.add_argument('--context-chars', type=int, default=DEFAULT_CONTEXT_CHARS)
     parser.add_argument('--min-grounding', type=float, default=DEFAULT_MIN_GROUNDING,

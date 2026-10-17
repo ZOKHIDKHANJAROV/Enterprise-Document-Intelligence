@@ -17,6 +17,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import random
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,7 +51,32 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def fix_mojibake(text: str) -> str:
+    """Repair cp1251 text that a PDF font mapped as cp1252 ("ÏËÀÑÒÈÍÛ" -> "ПЛАСТИНЫ")."""
+    latin = len(re.findall("[À-ÿ]", text))
+    if latin > 50 and latin > len(re.findall("[а-яА-ЯёЁ]", text)):
+        try:
+            return text.encode("cp1252").decode("cp1251")
+        except UnicodeError:
+            return text
+    return text
+
+
+def text_quality(text: str) -> float:
+    """Share of visible characters that belong to words of 3+ letters.
+
+    Readable documents score about 0.7-0.9. Broken text layers score low:
+    glyph codes ("/G01/G02"), OCR noise ("lI1l)"), control characters.
+    """
+    sample = text[:30000]
+    visible = len(re.sub(r"\s", "", sample))
+    if not visible:
+        return 0.0
+    return sum(len(word) for word in re.findall(r"[^\W\d_]{3,}", sample)) / visible
+
+
 def clean_text(text: str) -> str:
+    text = fix_mojibake(text)
     text = text.replace("\x00", " ")
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
@@ -236,6 +263,10 @@ def extract(
 
 def iter_documents(root: Path) -> Iterable[Path]:
     for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).parts
+        # Skip service folders such as _manifest.
+        if any(part.startswith("_") for part in relative[:-1]):
+            continue
         if path.is_file() and path.suffix.lower() in SUPPORTED:
             yield path
 
@@ -259,38 +290,111 @@ def main() -> None:
         default="rus+eng",
         help="Tesseract language code, e.g. rus+eng or eng.",
     )
+    parser.add_argument(
+        "--tesseract-cmd",
+        default=None,
+        help="Path to the tesseract executable if it is not on PATH.",
+    )
+    parser.add_argument(
+        "--tessdata-dir",
+        default=None,
+        help="Directory with *.traineddata files (sets TESSDATA_PREFIX).",
+    )
+    parser.add_argument(
+        "--min-text-chars",
+        type=int,
+        default=0,
+        help="Skip documents with less extracted text; with --max-documents, "
+        "keep sampling until that many documents pass.",
+    )
+    parser.add_argument(
+        "--min-quality",
+        type=float,
+        default=0.0,
+        help="Skip documents whose text_quality is lower (0.55 drops broken "
+        "text layers and OCR noise).",
+    )
+    parser.add_argument(
+        "--max-per-folder",
+        type=int,
+        default=None,
+        help="Cap accepted documents per top-level folder (document type) "
+        "so a dominant type does not take the whole sample.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Seed for sampling --max-documents across all folders.",
+    )
     args = parser.parse_args()
+
+    if args.tesseract_cmd:
+        import pytesseract
+
+        pytesseract.pytesseract.tesseract_cmd = args.tesseract_cmd
+    if args.tessdata_dir:
+        os.environ["TESSDATA_PREFIX"] = args.tessdata_dir
 
     documents = list(iter_documents(args.input_dir))
     if args.max_documents is not None:
-        documents = documents[: args.max_documents]
+        # Sample across the whole tree; the sorted order would take only the
+        # first folders (document types). Documents are visited in random
+        # order until max_documents are accepted.
+        random.Random(args.seed).shuffle(documents)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     stats = {
         "discovered": len(documents),
+        "min_text_chars": args.min_text_chars,
         "processed": 0,
         "empty": 0,
         "failed": 0,
         "ocr_documents": 0,
+        "duplicates": 0,
+        "too_short": 0,
+        "low_quality": 0,
+        "folder_cap": 0,
+        "folders": {},
         "errors": [],
         "extensions": {},
     }
 
+    seen_digests: set[str] = set()
     with args.output.open("w", encoding="utf-8") as output:
-        for path in tqdm(documents, desc="Extracting"):
+        progress = tqdm(documents, desc="Extracting", total=args.max_documents or len(documents))
+        for path in progress:
+            if args.max_documents is not None and stats["processed"] >= args.max_documents:
+                break
             extension = path.suffix.lower()
             stats["extensions"][extension] = (
                 stats["extensions"].get(extension, 0) + 1
             )
 
+            folder = path.relative_to(args.input_dir).parts[0] if len(path.relative_to(args.input_dir).parts) > 1 else ""
+            if args.max_per_folder is not None and stats["folders"].get(folder, 0) >= args.max_per_folder:
+                stats["folder_cap"] += 1
+                continue
             try:
+                digest = sha256_file(path)
+                # Identical files saved under several names ("x (1).pdf").
+                if digest in seen_digests:
+                    stats["duplicates"] += 1
+                    continue
+                seen_digests.add(digest)
                 text, units, extraction_method = extract(
                     path,
                     use_ocr=args.ocr,
                     ocr_languages=args.ocr_languages,
                 )
-                digest = sha256_file(path)
+                if len(text) < args.min_text_chars:
+                    stats["too_short"] += 1
+                    continue
+                quality = text_quality(text)
+                if quality < args.min_quality:
+                    stats["low_quality"] += 1
+                    continue
 
                 record = {
                     "document_id": digest,
@@ -300,6 +404,7 @@ def main() -> None:
                     "extraction_method": extraction_method,
                     "text": text,
                     "text_length": len(text),
+                    "text_quality": round(quality, 3),
                     "units": units,
                     "sha256": digest,
                     "extracted_at": datetime.now(timezone.utc).isoformat(),
@@ -309,6 +414,7 @@ def main() -> None:
                     json.dumps(record, ensure_ascii=False) + "\n"
                 )
                 stats["processed"] += 1
+                stats["folders"][folder] = stats["folders"].get(folder, 0) + 1
 
                 if extraction_method == "ocr":
                     stats["ocr_documents"] += 1

@@ -1,9 +1,9 @@
 # Enterprise data
 data/raw/
 data/extracted/
-data/dataset/*.jsonl
-data/dataset/*.json
-data/dataset/*.parquet
+data/dataset/*
+!data/dataset/README.md
+!data/dataset/.gitkeep
 *.pdf
 *.docx
 *.doc

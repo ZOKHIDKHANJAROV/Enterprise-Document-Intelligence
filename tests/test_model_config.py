@@ -100,3 +100,18 @@ def test_training_prompt_keeps_system_and_fits(path):
     assert SYSTEM_PROMPT in infer_text
     assert '<think>' not in train_text
     assert len(tokenizer(train_text, add_special_tokens=False)['input_ids']) <= cfg['training']['max_seq_length']
+
+
+def test_warmup_kwargs_supports_both_transformers_versions():
+    from train_qlora import warmup_kwargs
+
+    class Old:
+        def __init__(self, warmup_ratio=0.0, warmup_steps=0):
+            pass
+
+    class New:
+        def __init__(self, warmup_steps=0):
+            pass
+
+    assert warmup_kwargs(Old, 0.03) == {'warmup_ratio': 0.03}
+    assert warmup_kwargs(New, 0.03) == {'warmup_steps': 0.03}

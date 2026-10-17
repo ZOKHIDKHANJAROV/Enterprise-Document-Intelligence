@@ -192,6 +192,19 @@ Planned metrics:
 
 ## Workflow
 
+QA pairs are generated with a local OpenAI-compatible server. With Ollama:
+
+    ollama pull qwen3:4b-instruct
+    printf 'FROM qwen3:4b-instruct
+PARAMETER num_ctx 8192
+' > Modelfile.qa
+    ollama create qwen3-4b-qa -f Modelfile.qa
+
+Use the instruct model: qwen3:4b is a thinking model and reasons inside its
+answers even with thinking disabled. Point DOCS_DIR at the corpus, e.g.
+`make extract DOCS_DIR=D:/Qlora_fine_tuning/Docs`. Add --ocr to EXTRACT_FLAGS
+for scanned PDFs (needs Tesseract).
+
     make gpu
 
     make extract

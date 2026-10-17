@@ -45,8 +45,13 @@ def test_grounding_score_handles_word_forms():
 
 
 def test_select_context_uses_real_fragment_only():
-    real = 'Срок исполнения — до 31 марта 2026 года.'
-    assert select_context(ORDER_TEXT, real, 'Какой срок?', 'До 31 марта') == real
+    filler = 'Прочие положения приказа о порядке командирования. '
+    long_text = ORDER_TEXT + '\n' + filler * 60
+    real = ORDER_TEXT[ORDER_TEXT.index('ПРИКАЗ'):] + '\n' + filler * 2
+    assert len(real) >= qa.MIN_FRAGMENT_CHARS
+    assert select_context(long_text, real.strip(), 'Какой срок?', 'До 31 марта') == real.strip()
+    # Too short to be useful context: the whole (short) document is used.
+    assert select_context(ORDER_TEXT, 'ПРИКАЗ № 15', 'Номер?', '15') == ORDER_TEXT
     fake = 'Срок исполнения — до 1 января 2030 года.'
     assert select_context(ORDER_TEXT, fake, 'Какой срок?', 'До 31 марта') == ORDER_TEXT
 
@@ -106,3 +111,65 @@ def test_resume_skips_processed_documents(tmp_path, monkeypatch):
     rows = [json.loads(line) for line in output.read_text(encoding='utf-8').splitlines()]
     assert [r['document_id'] for r in rows] == ['doc-1', 'doc-2']
     assert set(load_existing(output)) == {'doc-1', 'doc-2'}
+
+
+def test_folder_type_wins_over_heading():
+    assert detect_document_type(ORDER_TEXT, 'Письма/x.pdf') == 'Письмо'
+
+
+def test_draft_stamp_is_not_a_type():
+    assert detect_document_type('ПРОЕКТ\nПРИКАЗ № 5') == 'Приказ'
+    assert detect_document_type('ПРОЕКТ\nПРИКАЗ № 5', 'Проекты/x.pdf') == 'Проект'
+
+
+def test_all_corpus_folders_have_types():
+    folders = ['Инструкции', 'Калькуляции', 'Лимиты', 'Лицензии', 'Нормативная документация',
+               'Организационно-технические мероприятия', 'Отчеты', 'Письма', 'Планы', 'Показатели',
+               'Политики', 'Положения', 'Правила', 'Приказы', 'Проекты', 'Рапорты', 'Распоряжения',
+               'Служебные записки', 'Сметы', 'Стандарты', 'Штатное расписание']
+    assert all(detect_document_type('', f'{folder}/x.pdf') != 'unknown' for folder in folders)
+    assert detect_document_type('Сметана и творог') == 'unknown'
+
+
+def test_parse_json_strips_think_block():
+    text = '<think>Нужно вернуть [список] вопросов</think>\n[{"instruction": "Q", "input": "", "output": "A"}]'
+    assert qa.parse_json(text) == [{'instruction': 'Q', 'input': '', 'output': 'A'}]
+
+
+def test_category_prefix_is_stripped():
+    raw = [{'instruction': 'Факт: Кто ответственный?', 'input': '', 'output': 'Начальник отдела кадров Иванова А.А.'},
+           {'instruction': 'Процедура — Какой срок?', 'input': '', 'output': 'До 31 марта 2026 года'}]
+    records = build_examples(document(), raw, 1800, 0.6, Counter())
+    assert [r['instruction'] for r in records] == ['Кто ответственный?', 'Какой срок?']
+
+
+def test_generate_halves_text_on_context_error(monkeypatch):
+    sent = []
+
+    class Response:
+        def __init__(self, status, text, payload=None):
+            self.status_code, self.text, self.payload = status, text, payload
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError(self.text)
+
+        def json(self):
+            return self.payload
+
+    def fake_post(url, headers, json, timeout):
+        sent.append(len(json['messages'][1]['content']))
+        if len(sent) == 1:
+            return Response(400, 'request exceeds the available context size')
+        return Response(200, '', {'choices': [{'message': {'content': '[]'}}]})
+
+    monkeypatch.setattr(qa.requests, 'post', fake_post)
+    assert qa.generate('http://x', 'm', 'а' * 1000, 5, 10) == []
+    assert sent[1] < sent[0]
+
+
+def test_parse_json_repairs_invalid_escapes():
+    text = r'[{"instruction": "Что означает \G?", "input": "", "output": "Символ \e и путь C:\docs"}]'
+    result = qa.parse_json(text)
+    assert result[0]['instruction'] == r'Что означает \G?'
+    assert result[0]['output'] == r'Символ \e и путь C:\docs'

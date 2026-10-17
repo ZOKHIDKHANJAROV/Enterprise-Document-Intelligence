@@ -9,6 +9,7 @@ bitsandbytes
 
 # Data / document processing
 pypdf
+fonttools  # better text extraction for CFF fonts in PDFs
 python-docx
 python-pptx
 openpyxl
