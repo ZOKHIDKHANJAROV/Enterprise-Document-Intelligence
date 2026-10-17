@@ -1,4 +1,4 @@
-.PHONY: gpu extract inspect qa validate split format train chat predict-base evaluate-base predict evaluate
+.PHONY: gpu extract inspect qa qa-resume validate split format train chat predict-base evaluate-base predict evaluate
 
 gpu:
 	python scripts/check_gpu.py
@@ -11,6 +11,9 @@ inspect:
 
 qa:
 	python scripts/generate_qa_dataset.py --input data/extracted/corpus.jsonl --output data/dataset/qa_raw.jsonl --base-url http://localhost:8000/v1 --model mistral --max-documents 500
+
+qa-resume:
+	python scripts/generate_qa_dataset.py --input data/extracted/corpus.jsonl --output data/dataset/qa_raw.jsonl --base-url http://localhost:8000/v1 --model mistral --max-documents 500 --resume
 
 validate:
 	python scripts/prepare_dataset.py --input data/dataset/qa_raw.jsonl --output data/dataset/qa_validated.jsonl
