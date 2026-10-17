@@ -1,4 +1,8 @@
-.PHONY: gpu extract inspect qa qa-resume validate split report format train chat predict-base evaluate-base predict evaluate
+# LLM judge endpoint; override with make judge JUDGE_MODEL=... JUDGE_URL=...
+JUDGE_URL ?= http://localhost:8000/v1
+JUDGE_MODEL ?= judge
+
+.PHONY: gpu extract inspect qa qa-resume validate split unanswerable report format train chat predict-base evaluate-base judge-base predict evaluate judge
 
 gpu:
 	python scripts/check_gpu.py
@@ -21,6 +25,9 @@ validate:
 split:
 	python scripts/split_dataset.py --input data/dataset/qa_validated.jsonl --output-dir data/dataset
 
+unanswerable:
+	python scripts/add_unanswerable.py --dataset-dir data/dataset --ratio 0.1
+
 report:
 	python scripts/dataset_report.py --input data/dataset/all.jsonl --corpus data/extracted/corpus.jsonl --split-dir data/dataset --strict
 
@@ -40,8 +47,14 @@ predict-base:
 evaluate-base:
 	python scripts/evaluate_generation.py --predictions evaluation/predictions_base.jsonl --output evaluation/results_base.json
 
+judge-base:
+	python scripts/judge_predictions.py --predictions evaluation/predictions_base.jsonl --output evaluation/judge_base.json --base-url $(JUDGE_URL) --model $(JUDGE_MODEL)
+
 predict:
 	python scripts/generate_predictions.py --input data/dataset/test.jsonl --output evaluation/predictions.jsonl --adapter models/adapters/mistral-qlora
 
 evaluate:
 	python scripts/evaluate_generation.py --predictions evaluation/predictions.jsonl --output evaluation/results.json
+
+judge:
+	python scripts/judge_predictions.py --predictions evaluation/predictions.jsonl --output evaluation/judge.json --base-url $(JUDGE_URL) --model $(JUDGE_MODEL)

@@ -2,7 +2,7 @@ import argparse
 import json
 from pathlib import Path
 
-from format_sft_dataset import DEFAULT_MAX_CONTEXT_CHARS, build_prompt_messages
+from format_sft_dataset import DEFAULT_MAX_CONTEXT_CHARS, build_prompt_messages, truncate_context
 
 # Heavy ML libraries are imported inside main() so the CLI and prompt building
 # can be tested without torch/transformers installed.
@@ -52,7 +52,7 @@ def main():
                 outputs = model.generate(**inputs, max_new_tokens=args.max_new_tokens, do_sample=False, pad_token_id=tokenizer.eos_token_id)
             generated = outputs[0][inputs['input_ids'].shape[1]:]
             prediction = tokenizer.decode(generated, skip_special_tokens=True).strip()
-            target.write(json.dumps({'document_id': record.get('document_id'), 'model': model_label, 'instruction': record['instruction'], 'reference': record['output'], 'prediction': prediction}, ensure_ascii=False) + '\n')
+            target.write(json.dumps({'document_id': record.get('document_id'), 'model': model_label, 'answerable': record.get('answerable', True), 'instruction': record['instruction'], 'context': truncate_context(record.get('input'), args.max_context_chars), 'reference': record['output'], 'prediction': prediction}, ensure_ascii=False) + '\n')
 
 
 if __name__ == '__main__':

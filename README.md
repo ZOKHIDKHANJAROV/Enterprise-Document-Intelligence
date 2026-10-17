@@ -56,8 +56,15 @@ Data pipeline:
   `make qa-resume` to continue an interrupted run;
 - QA dataset validation;
 - document-level dataset splitting;
+- unanswerable examples (question from another document, expected refusal)
+  added inside each split;
 - EXP-00 dataset sanity report with a Markdown sample for manual review;
 - conversational prompt/completion SFT formatting with context truncation.
+
+Evaluation:
+- lexical baseline plus refusal accuracy and false-refusal rate;
+- LLM judge: correctness, faithfulness and hallucination rate. Use a judge
+  model stronger than, or different from, the evaluated model.
 
 QLoRA pipeline:
 - Mistral-7B-Instruct-v0.3;
@@ -183,6 +190,8 @@ Planned metrics:
 
     make split
 
+    make unanswerable
+
     make report
 
     make format
@@ -191,11 +200,15 @@ Planned metrics:
 
     make evaluate-base
 
+    make judge-base JUDGE_MODEL=<judge model>
+
     make train
 
     make predict
 
     make evaluate
+
+    make judge JUDGE_MODEL=<judge model>
 
 The commands are documented but have not been executed during repository
 preparation.
