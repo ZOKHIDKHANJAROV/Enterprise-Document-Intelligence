@@ -41,13 +41,17 @@ def normalize_record(record: dict, line_number: int) -> dict:
     if not isinstance(document_type, str):
         raise ValueError(f"Line {line_number}: 'document_type' must be a string.")
 
-    return {
+    normalized = {
         "document_id": str(record["document_id"]).strip(),
         "document_type": document_type.strip(),
         "instruction": record["instruction"].strip(),
         "input": input_text.strip(),
         "output": record["output"].strip(),
     }
+    # Keep the generation grounding score for dataset_report.py.
+    if isinstance(record.get("grounding"), (int, float)):
+        normalized["grounding"] = record["grounding"]
+    return normalized
 
 
 def validate_jsonl(input_path: Path, output_path: Path) -> int:

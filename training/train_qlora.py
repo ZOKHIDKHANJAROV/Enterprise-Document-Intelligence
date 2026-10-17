@@ -52,6 +52,8 @@ def main():
         cfg = yaml.safe_load(handle)
     if not torch.cuda.is_available():
         raise RuntimeError('CUDA GPU is required for QLoRA training.')
+    if cfg['training'].get('bf16') and not torch.cuda.is_bf16_supported():
+        raise RuntimeError('This GPU does not support bf16; set compute_dtype: float16, fp16: true, bf16: false in the config.')
 
     q = cfg['quantization']
     compute_dtype = dtype_from_name(q['compute_dtype'])
@@ -73,7 +75,7 @@ def main():
     l = cfg['lora']
     peft_config = LoraConfig(r=l['r'], lora_alpha=l['alpha'], lora_dropout=l['dropout'], bias=l['bias'], task_type='CAUSAL_LM', target_modules=l['target_modules'])
 
-    training_args = SFTConfig(output_dir=cfg['output_dir'], num_train_epochs=t['num_train_epochs'], per_device_train_batch_size=t['per_device_train_batch_size'], per_device_eval_batch_size=t['per_device_eval_batch_size'], gradient_accumulation_steps=t['gradient_accumulation_steps'], gradient_checkpointing=t['gradient_checkpointing'], learning_rate=t['learning_rate'], weight_decay=t['weight_decay'], fp16=t['fp16'], logging_steps=t['logging_steps'], eval_strategy='steps', eval_steps=t['eval_steps'], save_strategy='steps', save_steps=t['save_steps'], save_total_limit=t['save_total_limit'], optim=t['optim'], warmup_ratio=t['warmup_ratio'], lr_scheduler_type=t['lr_scheduler_type'], report_to='none', load_best_model_at_end=True, metric_for_best_model='eval_loss', greater_is_better=False, max_length=t['max_seq_length'], completion_only_loss=True)
+    training_args = SFTConfig(output_dir=cfg['output_dir'], num_train_epochs=t['num_train_epochs'], per_device_train_batch_size=t['per_device_train_batch_size'], per_device_eval_batch_size=t['per_device_eval_batch_size'], gradient_accumulation_steps=t['gradient_accumulation_steps'], gradient_checkpointing=t['gradient_checkpointing'], learning_rate=t['learning_rate'], weight_decay=t['weight_decay'], fp16=t.get('fp16', False), bf16=t.get('bf16', False), logging_steps=t['logging_steps'], eval_strategy='steps', eval_steps=t['eval_steps'], save_strategy='steps', save_steps=t['save_steps'], save_total_limit=t['save_total_limit'], optim=t['optim'], warmup_ratio=t['warmup_ratio'], lr_scheduler_type=t['lr_scheduler_type'], report_to='none', load_best_model_at_end=True, metric_for_best_model='eval_loss', greater_is_better=False, max_length=t['max_seq_length'], completion_only_loss=True)
 
     trainer = SFTTrainer(model=model, args=training_args, train_dataset=train_ds, eval_dataset=val_ds, processing_class=tokenizer, peft_config=peft_config)
     trainer.train()

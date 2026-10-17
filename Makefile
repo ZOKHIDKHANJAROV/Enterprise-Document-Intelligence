@@ -1,4 +1,4 @@
-.PHONY: gpu extract inspect qa qa-resume validate split format train chat predict-base evaluate-base predict evaluate
+.PHONY: gpu extract inspect qa qa-resume validate split report format train chat predict-base evaluate-base predict evaluate
 
 gpu:
 	python scripts/check_gpu.py
@@ -20,6 +20,9 @@ validate:
 
 split:
 	python scripts/split_dataset.py --input data/dataset/qa_validated.jsonl --output-dir data/dataset
+
+report:
+	python scripts/dataset_report.py --input data/dataset/all.jsonl --corpus data/extracted/corpus.jsonl --split-dir data/dataset --strict
 
 format:
 	python scripts/format_sft_dataset.py --input data/dataset/train.jsonl --output data/dataset/train_sft.jsonl

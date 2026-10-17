@@ -1,14 +1,18 @@
 import argparse
+import sys
+from pathlib import Path
 
 import torch
-from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+from format_sft_dataset import SYSTEM_PROMPT  # noqa: E402  same prompt as training
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--base-model', default='mistralai/Mistral-7B-Instruct-v0.3')
-    parser.add_argument('--adapter', required=True)
+    parser.add_argument('--adapter', default=None, help='Omit to chat with the base model.')
     parser.add_argument('--max-new-tokens', type=int, default=256)
     args = parser.parse_args()
 
@@ -16,11 +20,14 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.base_model, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    base = AutoModelForCausalLM.from_pretrained(args.base_model, quantization_config=quant, device_map='auto', torch_dtype=torch.float16)
-    model = PeftModel.from_pretrained(base, args.adapter)
+    model = AutoModelForCausalLM.from_pretrained(args.base_model, quantization_config=quant, device_map='auto', torch_dtype=torch.float16)
+    if args.adapter:
+        from peft import PeftModel
+
+        model = PeftModel.from_pretrained(model, args.adapter)
     model.eval()
 
-    print("QLoRA assistant ready. Type 'exit' to stop.")
+    print(f"{'QLoRA' if args.adapter else 'Base'} assistant ready. Type 'exit' to stop.")
     while True:
         question = input('\nUser: ').strip()
         if question.lower() in {'exit', 'quit'}:
@@ -28,11 +35,11 @@ def main():
         if not question:
             continue
         messages = [
-            {'role': 'system', 'content': 'Ты корпоративный AI-ассистент. Не выдумывай факты. Если данных недостаточно, скажи об этом.'},
+            {'role': 'system', 'content': SYSTEM_PROMPT},
             {'role': 'user', 'content': question},
         ]
         prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        inputs = tokenizer(prompt, return_tensors='pt').to(model.device)
+        inputs = tokenizer(prompt, return_tensors='pt', add_special_tokens=False).to(model.device)
         with torch.inference_mode():
             outputs = model.generate(**inputs, max_new_tokens=args.max_new_tokens, do_sample=False, pad_token_id=tokenizer.eos_token_id)
         generated = outputs[0][inputs['input_ids'].shape[1]:]

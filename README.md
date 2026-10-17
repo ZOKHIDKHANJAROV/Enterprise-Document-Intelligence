@@ -56,6 +56,7 @@ Data pipeline:
   `make qa-resume` to continue an interrupted run;
 - QA dataset validation;
 - document-level dataset splitting;
+- EXP-00 dataset sanity report with a Markdown sample for manual review;
 - conversational prompt/completion SFT formatting with context truncation.
 
 QLoRA pipeline:
@@ -181,6 +182,8 @@ Planned metrics:
     make validate
 
     make split
+
+    make report
 
     make format
 
