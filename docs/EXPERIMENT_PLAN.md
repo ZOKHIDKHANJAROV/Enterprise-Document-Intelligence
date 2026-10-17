@@ -14,7 +14,7 @@ Checks:
 
 ## EXP-01 Base model baseline
 
-Run the base Mistral model on the held-out test set without the adapter.
+Run the base Qwen/Qwen3-4B-Instruct-2507 model on the held-out test set without the adapter.
 Record generation settings, latency and evaluation metrics.
 
 ## EXP-02 QLoRA
@@ -50,8 +50,9 @@ Compare 1024 and 2048 tokens after establishing a stable 1024-token run.
 
 ## EXP-06 Model comparison
 
-Repeat the controlled experiment with a suitable Llama instruct checkpoint.
-The exact Llama checkpoint will be selected before the experiment and recorded
+Repeat the controlled experiment with mistralai/Mistral-7B-Instruct-v0.3
+(configs/qlora_mistral.yaml, RUN=mistral-7b). On an 8 GB GPU the 7B model may
+need max_seq_length 768. Any change to the comparison checkpoint is recorded
 in the experiment configuration.
 
 ## EXP-07 RAG integration

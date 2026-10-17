@@ -1,5 +1,7 @@
-model_name: "mistralai/Mistral-7B-Instruct-v0.3"
-output_dir: "models/adapters/mistral-qlora"
+# Main model: Qwen3 4B instruct (non-thinking 2507 release). Fits QLoRA on an
+# 8 GB GPU at max_seq_length 1024. Mistral 7B is kept in qlora_mistral.yaml.
+model_name: "Qwen/Qwen3-4B-Instruct-2507"
+output_dir: "models/adapters/qwen3-4b-qlora"
 
 quantization:
   load_in_4bit: true

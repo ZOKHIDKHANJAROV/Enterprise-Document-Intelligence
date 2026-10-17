@@ -1,9 +1,9 @@
 # Core ML
 torch
-transformers
+transformers>=4.51  # Qwen3 support
 datasets
 peft
-trl
+trl>=0.20  # conversational prompt-completion with completion_only_loss
 accelerate
 bitsandbytes
 

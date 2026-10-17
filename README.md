@@ -31,7 +31,7 @@ with RAG?
     Document-level train/validation/test split
             |
             v
-    Mistral 7B + 4-bit NF4
+    Qwen3 4B + 4-bit NF4
             |
             v
     QLoRA adapter
@@ -67,14 +67,14 @@ Evaluation:
   model stronger than, or different from, the evaluated model.
 
 QLoRA pipeline:
-- Mistral-7B-Instruct-v0.3;
+- Qwen/Qwen3-4B-Instruct-2507 (configs/qlora.yaml);
 - 4-bit NF4 quantization;
 - double quantization;
 - PEFT LoRA;
 - all-linear target modules;
 - gradient checkpointing;
 - paged 8-bit AdamW;
-- FP16 compute;
+- BF16 compute;
 - initial sequence length 1024;
 - batch size 1 with gradient accumulation.
 
@@ -86,8 +86,13 @@ TRL supports standard and conversational SFT datasets and PEFT adapters. The
 project keeps SFT data in conversational prompt/completion format, so the
 loss is computed only on the assistant answer.
 
-The selected Mistral checkpoint is the official
-mistralai/Mistral-7B-Instruct-v0.3 model.
+The main model is Qwen/Qwen3-4B-Instruct-2507: the non-thinking Qwen3 instruct
+release, small enough for QLoRA on an 8 GB GPU. mistralai/Mistral-7B-Instruct-v0.3
+is kept in configs/qlora_mistral.yaml for the EXP-06 comparison:
+
+    make train predict evaluate CONFIG=configs/qlora_mistral.yaml RUN=mistral-7b
+
+Evaluation outputs go to evaluation/<RUN>/, so runs do not overwrite each other.
 
 ## Repository structure
 
@@ -158,12 +163,12 @@ After the pipeline is reviewed, scale to the complete corpus.
 
 ## Experiments
 
-EXP-01  Base Mistral baseline
-EXP-02  Mistral + QLoRA
+EXP-01  Base Qwen3 baseline
+EXP-02  Qwen3 + QLoRA
 EXP-03  Dataset-size scaling
 EXP-04  LoRA rank comparison
 EXP-05  Sequence-length comparison
-EXP-06  Mistral vs Llama
+EXP-06  Qwen3 4B vs Mistral 7B
 EXP-07  QLoRA + RAG
 EXP-08  Hybrid retrieval + reranking
 

@@ -1,3 +1,12 @@
+# Model under test. EXP-06 Mistral run: make train predict evaluate CONFIG=configs/qlora_mistral.yaml RUN=mistral-7b
+CONFIG ?= configs/qlora.yaml
+RUN ?= qwen3-4b
+EVAL_DIR = evaluation/$(RUN)
+
+# OpenAI-compatible endpoint (e.g. vLLM) used to generate QA pairs.
+QA_URL ?= http://localhost:8000/v1
+QA_MODEL ?= Qwen/Qwen3-4B-Instruct-2507
+
 # LLM judge endpoint; override with make judge JUDGE_MODEL=... JUDGE_URL=...
 JUDGE_URL ?= http://localhost:8000/v1
 JUDGE_MODEL ?= judge
@@ -14,10 +23,10 @@ inspect:
 	python scripts/inspect_corpus.py --input data/extracted/corpus.jsonl
 
 qa:
-	python scripts/generate_qa_dataset.py --input data/extracted/corpus.jsonl --output data/dataset/qa_raw.jsonl --base-url http://localhost:8000/v1 --model mistral --max-documents 500
+	python scripts/generate_qa_dataset.py --input data/extracted/corpus.jsonl --output data/dataset/qa_raw.jsonl --base-url $(QA_URL) --model $(QA_MODEL) --max-documents 500
 
 qa-resume:
-	python scripts/generate_qa_dataset.py --input data/extracted/corpus.jsonl --output data/dataset/qa_raw.jsonl --base-url http://localhost:8000/v1 --model mistral --max-documents 500 --resume
+	python scripts/generate_qa_dataset.py --input data/extracted/corpus.jsonl --output data/dataset/qa_raw.jsonl --base-url $(QA_URL) --model $(QA_MODEL) --max-documents 500 --resume
 
 validate:
 	python scripts/prepare_dataset.py --input data/dataset/qa_raw.jsonl --output data/dataset/qa_validated.jsonl
@@ -36,25 +45,25 @@ format:
 	python scripts/format_sft_dataset.py --input data/dataset/validation.jsonl --output data/dataset/validation_sft.jsonl
 
 train:
-	python training/train_qlora.py --train data/dataset/train_sft.jsonl --validation data/dataset/validation_sft.jsonl
+	python training/train_qlora.py --config $(CONFIG) --train data/dataset/train_sft.jsonl --validation data/dataset/validation_sft.jsonl
 
 chat:
-	python inference/chat.py --adapter models/adapters/mistral-qlora
+	python inference/chat.py --config $(CONFIG) --with-adapter
 
 predict-base:
-	python scripts/generate_predictions.py --input data/dataset/test.jsonl --output evaluation/predictions_base.jsonl
+	python scripts/generate_predictions.py --input data/dataset/test.jsonl --output $(EVAL_DIR)/predictions_base.jsonl --config $(CONFIG)
 
 evaluate-base:
-	python scripts/evaluate_generation.py --predictions evaluation/predictions_base.jsonl --output evaluation/results_base.json
+	python scripts/evaluate_generation.py --predictions $(EVAL_DIR)/predictions_base.jsonl --output $(EVAL_DIR)/results_base.json
 
 judge-base:
-	python scripts/judge_predictions.py --predictions evaluation/predictions_base.jsonl --output evaluation/judge_base.json --base-url $(JUDGE_URL) --model $(JUDGE_MODEL)
+	python scripts/judge_predictions.py --predictions $(EVAL_DIR)/predictions_base.jsonl --output $(EVAL_DIR)/judge_base.json --base-url $(JUDGE_URL) --model $(JUDGE_MODEL)
 
 predict:
-	python scripts/generate_predictions.py --input data/dataset/test.jsonl --output evaluation/predictions.jsonl --adapter models/adapters/mistral-qlora
+	python scripts/generate_predictions.py --input data/dataset/test.jsonl --output $(EVAL_DIR)/predictions.jsonl --config $(CONFIG) --with-adapter
 
 evaluate:
-	python scripts/evaluate_generation.py --predictions evaluation/predictions.jsonl --output evaluation/results.json
+	python scripts/evaluate_generation.py --predictions $(EVAL_DIR)/predictions.jsonl --output $(EVAL_DIR)/results.json
 
 judge:
-	python scripts/judge_predictions.py --predictions evaluation/predictions.jsonl --output evaluation/judge.json --base-url $(JUDGE_URL) --model $(JUDGE_MODEL)
+	python scripts/judge_predictions.py --predictions $(EVAL_DIR)/predictions.jsonl --output $(EVAL_DIR)/judge.json --base-url $(JUDGE_URL) --model $(JUDGE_MODEL)

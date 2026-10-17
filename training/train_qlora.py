@@ -1,5 +1,8 @@
 import argparse
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 
 # Heavy ML libraries are imported inside main() so the data helpers below can
 # be tested without torch/transformers installed.
@@ -17,6 +20,12 @@ def dtype_from_name(name):
 def example_length(example, tokenizer):
     text = tokenizer.apply_chat_template(example['prompt'] + example['completion'], tokenize=False)
     return len(tokenizer(text, add_special_tokens=False)['input_ids'])
+
+
+def merge_system_in_example(example):
+    from format_sft_dataset import merge_system_prompt
+
+    return {'prompt': merge_system_prompt(example['prompt'])}
 
 
 def fits_max_length(example, count_tokens, max_length):
@@ -65,6 +74,9 @@ def main():
     t = cfg['training']
     train_ds = load_dataset('json', data_files=str(args.train), split='train').select_columns(['prompt', 'completion'])
     val_ds = load_dataset('json', data_files=str(args.validation), split='train').select_columns(['prompt', 'completion'])
+    if cfg.get('merge_system_prompt'):
+        train_ds = train_ds.map(merge_system_in_example)
+        val_ds = val_ds.map(merge_system_in_example)
     train_ds = filter_by_length(train_ds, tokenizer, t['max_seq_length'], 'train')
     val_ds = filter_by_length(val_ds, tokenizer, t['max_seq_length'], 'validation')
 

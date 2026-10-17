@@ -35,6 +35,24 @@ def build_prompt_messages(record, max_context_chars=DEFAULT_MAX_CONTEXT_CHARS):
     ]
 
 
+def merge_system_prompt(messages):
+    """Fold the system message into the first user message.
+
+    Some chat templates (Mistral v0.3) drop the system message whenever an
+    assistant turn follows, i.e. during training but not at inference. Merging
+    keeps the prompt identical in both cases. Enabled by merge_system_prompt
+    in the QLoRA config.
+    """
+    if not messages or messages[0]['role'] != 'system':
+        return messages
+    system, rest = messages[0]['content'], [dict(m) for m in messages[1:]]
+    for message in rest:
+        if message['role'] == 'user':
+            message['content'] = f"{system}\n\n{message['content']}"
+            break
+    return rest
+
+
 def format_record(record, max_context_chars=DEFAULT_MAX_CONTEXT_CHARS):
     # Conversational prompt-completion format: TRL computes the loss only on
     # the completion (assistant answer), not on the system prompt and context.
