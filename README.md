@@ -51,6 +51,9 @@ Data pipeline:
 - SHA-256 document identity;
 - basic text cleaning;
 - corpus statistics;
+- QA generation with document-type detection, grounding filter (share of
+  answer words found in the context), per-document question dedupe, and
+  `make qa-resume` to continue an interrupted run;
 - QA dataset validation;
 - document-level dataset splitting;
 - conversational prompt/completion SFT formatting with context truncation.
