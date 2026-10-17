@@ -47,5 +47,6 @@ outputs/
 runs/
 mlruns/
 wandb/
-evaluation/*.json
-evaluation/*.jsonl
+# Predictions, reports and review samples contain document text.
+evaluation/*
+!evaluation/.gitkeep

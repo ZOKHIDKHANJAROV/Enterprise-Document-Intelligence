@@ -29,7 +29,7 @@ def rate(values):
 def summarize(rows):
     answerable = [r for r in rows if r.get("answerable", True)]
     unanswerable = [r for r in rows if not r.get("answerable", True)]
-    return {
+    summary = {
         "examples": len(rows),
         "answerable_examples": len(answerable),
         "unanswerable_examples": len(unanswerable),
@@ -42,6 +42,17 @@ def summarize(rows):
         "false_refusal_rate": rate([r["refusal"] for r in answerable]),
         "warning": "Lexical and refusal metrics are a baseline only; see judge_predictions.py.",
     }
+    rag = [r for r in rows if "retrieved_document_ids" in r]
+    if rag:
+        summary.update({
+            # Source document of the question is among the retrieved chunks.
+            "retrieval_hit_rate": rate([r["document_id"] in r["retrieved_document_ids"] for r in rag]),
+            # Answer cites at least one source.
+            "citation_rate": rate([bool(r.get("cited_document_ids")) for r in rag]),
+            # Answer cites the question's source document.
+            "citation_accuracy": rate([r["document_id"] in r.get("cited_document_ids", []) for r in rag]),
+        })
+    return summary
 
 
 def score_row(row):

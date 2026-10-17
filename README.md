@@ -61,6 +61,13 @@ Data pipeline:
 - EXP-00 dataset sanity report with a Markdown sample for manual review;
 - conversational prompt/completion SFT formatting with context truncation.
 
+RAG:
+- corpus chunking (600 chars, 100 overlap) with BM25, Qwen3-Embedding-0.6B
+  dense retrieval and hybrid reciprocal rank fusion;
+- optional Qwen3-Reranker-0.6B over the top 50 candidates;
+- retrieval evaluation (recall@k, MRR by source document);
+- RAG generation with numbered sources and [n] citations; citation metrics.
+
 Evaluation:
 - lexical baseline plus refusal accuracy and false-refusal rate;
 - LLM judge: correctness, faithfulness and hallucination rate. Use a judge
@@ -214,6 +221,16 @@ Planned metrics:
     make evaluate
 
     make judge JUDGE_MODEL=<judge model>
+
+RAG (EXP-07/08):
+
+    make index            # or index-bm25 without a GPU
+
+    make eval-retrieval
+
+    make rag-base rag-evaluate-base
+
+    make rag rag-evaluate
 
 The commands are documented but have not been executed during repository
 preparation.

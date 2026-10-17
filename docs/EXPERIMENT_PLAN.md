@@ -58,7 +58,21 @@ in the experiment configuration.
 ## EXP-07 RAG integration
 
 Use the QLoRA adapter as the generation model and add retrieval over the full
-enterprise corpus.
+enterprise corpus (make extract-full, then make index INDEX_CORPUS=data/extracted/corpus_full.jsonl).
+
+Compare on the same test questions:
+- base model + RAG (make rag-base) vs QLoRA + RAG (make rag);
+- RAG vs the oracle context used in EXP-01/02, to separate retrieval errors
+  from generation errors.
+
+Metrics: retrieval_hit_rate, citation_rate, citation_accuracy, plus the judge
+metrics (make judge on the RAG predictions).
+
+## EXP-08 Hybrid retrieval and reranking
+
+make eval-retrieval reports recall@1/3/5/10 and MRR for bm25, dense and
+hybrid retrieval, each with and without Qwen3-Reranker. Pick the best
+configuration and set RAG_FLAGS accordingly.
 
 ## Metrics
 

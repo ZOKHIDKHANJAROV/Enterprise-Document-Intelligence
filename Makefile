@@ -7,11 +7,16 @@ EVAL_DIR = evaluation/$(RUN)
 QA_URL ?= http://localhost:8000/v1
 QA_MODEL ?= Qwen/Qwen3-4B-Instruct-2507
 
+# RAG: index over INDEX_CORPUS (use corpus_full.jsonl from make extract-full for the whole corpus).
+INDEX_CORPUS ?= data/extracted/corpus.jsonl
+INDEX_DIR ?= models/rag_index
+RAG_FLAGS ?= --mode hybrid --rerank --top-k 5
+
 # LLM judge endpoint; override with make judge JUDGE_MODEL=... JUDGE_URL=...
 JUDGE_URL ?= http://localhost:8000/v1
 JUDGE_MODEL ?= judge
 
-.PHONY: gpu extract inspect qa qa-resume validate split unanswerable report format train chat predict-base evaluate-base judge-base predict evaluate judge
+.PHONY: gpu extract inspect qa qa-resume validate split unanswerable report format extract-full index index-bm25 eval-retrieval rag-base rag rag-evaluate-base rag-evaluate train chat predict-base evaluate-base judge-base predict evaluate judge
 
 gpu:
 	python scripts/check_gpu.py
@@ -67,3 +72,27 @@ evaluate:
 
 judge:
 	python scripts/judge_predictions.py --predictions $(EVAL_DIR)/predictions.jsonl --output $(EVAL_DIR)/judge.json --base-url $(JUDGE_URL) --model $(JUDGE_MODEL)
+
+extract-full:
+	python scripts/extract_documents.py --input-dir data/raw/documents --output data/extracted/corpus_full.jsonl --ocr
+
+index:
+	python scripts/rag_retrieval.py --corpus $(INDEX_CORPUS) --output-dir $(INDEX_DIR)
+
+index-bm25:
+	python scripts/rag_retrieval.py --corpus $(INDEX_CORPUS) --output-dir $(INDEX_DIR) --no-dense
+
+eval-retrieval:
+	python scripts/evaluate_retrieval.py --input data/dataset/test.jsonl --index-dir $(INDEX_DIR) --output $(EVAL_DIR)/retrieval.json --rerank
+
+rag-base:
+	python scripts/rag_predict.py --input data/dataset/test.jsonl --output $(EVAL_DIR)/rag_base.jsonl --index-dir $(INDEX_DIR) --config $(CONFIG) $(RAG_FLAGS)
+
+rag:
+	python scripts/rag_predict.py --input data/dataset/test.jsonl --output $(EVAL_DIR)/rag.jsonl --index-dir $(INDEX_DIR) --config $(CONFIG) --with-adapter $(RAG_FLAGS)
+
+rag-evaluate-base:
+	python scripts/evaluate_generation.py --predictions $(EVAL_DIR)/rag_base.jsonl --output $(EVAL_DIR)/rag_results_base.json
+
+rag-evaluate:
+	python scripts/evaluate_generation.py --predictions $(EVAL_DIR)/rag.jsonl --output $(EVAL_DIR)/rag_results.json
