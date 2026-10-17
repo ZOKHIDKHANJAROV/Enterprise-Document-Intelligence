@@ -32,8 +32,11 @@ def main():
 
     records = load_records(args.input)
     groups = defaultdict(list)
-    for record in records:
-        groups[str(record.get('document_id', 'unknown'))].append(record)
+    for line_number, record in enumerate(records, start=1):
+        document_id = record.get('document_id')
+        if document_id is None or not str(document_id).strip():
+            raise ValueError(f'Record {line_number}: missing document_id; run prepare_dataset.py first.')
+        groups[str(document_id)].append(record)
 
     ids = list(groups)
     random.Random(args.seed).shuffle(ids)
