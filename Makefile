@@ -1,4 +1,4 @@
-.PHONY: gpu extract inspect qa validate split format train chat predict evaluate
+.PHONY: gpu extract inspect qa validate split format train chat predict-base evaluate-base predict evaluate
 
 gpu:
 	python scripts/check_gpu.py
@@ -27,6 +27,12 @@ train:
 
 chat:
 	python inference/chat.py --adapter models/adapters/mistral-qlora
+
+predict-base:
+	python scripts/generate_predictions.py --input data/dataset/test.jsonl --output evaluation/predictions_base.jsonl
+
+evaluate-base:
+	python scripts/evaluate_generation.py --predictions evaluation/predictions_base.jsonl --output evaluation/results_base.json
 
 predict:
 	python scripts/generate_predictions.py --input data/dataset/test.jsonl --output evaluation/predictions.jsonl --adapter models/adapters/mistral-qlora

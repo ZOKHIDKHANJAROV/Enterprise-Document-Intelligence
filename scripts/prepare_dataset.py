@@ -1,7 +1,11 @@
 """Validate and normalize an instruction-tuning JSONL dataset.
 
 Expected input records:
-{"instruction": "...", "input": "...", "output": "..."}
+{"document_id": "...", "document_type": "...", "instruction": "...",
+ "input": "...", "output": "..."}
+
+document_id is required because the train/validation/test split is done by
+document. document_type defaults to "unknown".
 
 The script does not generate training examples. It validates the dataset so
 QLoRA is not started against malformed or empty records.
@@ -14,12 +18,14 @@ import json
 from pathlib import Path
 
 
-REQUIRED_FIELDS = ("instruction", "output")
+REQUIRED_FIELDS = ("document_id", "instruction", "output")
 
 
 def normalize_record(record: dict, line_number: int) -> dict:
     for field in REQUIRED_FIELDS:
         value = record.get(field)
+        if field == "document_id" and isinstance(value, int):
+            value = str(value)
         if not isinstance(value, str) or not value.strip():
             raise ValueError(
                 f"Line {line_number}: '{field}' must be a non-empty string."
@@ -31,7 +37,13 @@ def normalize_record(record: dict, line_number: int) -> dict:
     if not isinstance(input_text, str):
         raise ValueError(f"Line {line_number}: 'input' must be a string.")
 
+    document_type = record.get("document_type") or "unknown"
+    if not isinstance(document_type, str):
+        raise ValueError(f"Line {line_number}: 'document_type' must be a string.")
+
     return {
+        "document_id": str(record["document_id"]).strip(),
+        "document_type": document_type.strip(),
         "instruction": record["instruction"].strip(),
         "input": input_text.strip(),
         "output": record["output"].strip(),

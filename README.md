@@ -53,7 +53,7 @@ Data pipeline:
 - corpus statistics;
 - QA dataset validation;
 - document-level dataset splitting;
-- conversational SFT formatting.
+- conversational prompt/completion SFT formatting with context truncation.
 
 QLoRA pipeline:
 - Mistral-7B-Instruct-v0.3;
@@ -72,7 +72,8 @@ LoRA weights and recommends NF4 for 4-bit training. The current PEFT
 documentation also supports all-linear targeting for QLoRA-style training.
 
 TRL supports standard and conversational SFT datasets and PEFT adapters. The
-project therefore keeps SFT data in structured messages format.
+project keeps SFT data in conversational prompt/completion format, so the
+loss is computed only on the assistant answer.
 
 The selected Mistral checkpoint is the official
 mistralai/Mistral-7B-Instruct-v0.3 model.
@@ -179,6 +180,10 @@ Planned metrics:
     make split
 
     make format
+
+    make predict-base
+
+    make evaluate-base
 
     make train
 
