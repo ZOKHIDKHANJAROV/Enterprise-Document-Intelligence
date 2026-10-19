@@ -82,3 +82,17 @@ def test_chat_uses_training_system_prompt():
     source = (ROOT / 'inference' / 'chat.py').read_text(encoding='utf-8')
     assert 'from format_sft_dataset import SYSTEM_PROMPT' in source
     assert "'content': SYSTEM_PROMPT" in source
+
+
+def test_prepare_drops_noisy_pairs_and_joins_list_answers(tmp_path):
+    src, dst = tmp_path / 'raw.jsonl', tmp_path / 'out.jsonl'
+    rows = [qa('doc-1'),
+            qa('doc-2', input='Мехжш,t,нн ,ttухофilЗt} ýýjIHш хспраёнила и{100нки}лг'),
+            qa('doc-3', output="['С 01.07.74', 'до 01.07.94']")]
+    src.write_text(''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in rows), encoding='utf-8')
+    stats = {}
+    assert validate_jsonl(src, dst, max_noise=0.3, stats=stats) == 2
+    assert stats == {'noisy': 1}
+    out = [json.loads(line) for line in dst.read_text(encoding='utf-8').splitlines()]
+    assert [r['document_id'] for r in out] == ['doc-1', 'doc-3']
+    assert out[1]['output'] == 'С 01.07.74; до 01.07.94'

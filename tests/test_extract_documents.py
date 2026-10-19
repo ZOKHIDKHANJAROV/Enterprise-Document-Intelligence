@@ -1,12 +1,4 @@
-import sys
-from pathlib import Path
-
-import pytest
-
-pytest.importorskip('docx')
-pytest.importorskip('pypdf')
-
-from extract_documents import fix_mojibake, text_quality  # noqa: E402
+from text_quality import fix_mojibake, noise_ratio, text_quality
 
 
 def test_fix_mojibake_repairs_cp1251_read_as_cp1252():
@@ -23,3 +15,12 @@ def test_text_quality_separates_readable_from_broken():
     assert text_quality("l;1l,tl l] l l 1l lI ))\nl l)\"])i)l)ll |l;l)l)ll]j1l l " * 20) < 0.3
     assert text_quality('\x05\x14\x05\x15\x16\n\x0e' * 30) == 0.0
     assert text_quality('') == 0.0
+
+
+def test_noise_ratio_flags_ocr_noise_not_lists_or_numbers():
+    assert noise_ratio('Мехжш,t,нн ,ttухофilЗt} ýýjIHш хспраёнила и{100нки}лг') > 0.5
+    assert noise_ratio('ГОСТ 12.1.004–91, ГОСТ 12.1.005–88, ГОСТ 12.1.007–76') == 0.0
+    assert noise_ratio('Ответственным назначен начальник отдела кадров.') == 0.0
+    assert noise_ratio('Oltin saralash fabrikasi probir analitik nazorat') == 0.0
+    assert noise_ratio('01.07.81') == 0.0
+    assert noise_ratio('') == 0.0

@@ -173,3 +173,9 @@ def test_parse_json_repairs_invalid_escapes():
     result = qa.parse_json(text)
     assert result[0]['instruction'] == r'Что означает \G?'
     assert result[0]['output'] == r'Символ \e и путь C:\docs'
+
+
+def test_list_answer_is_joined():
+    raw = [{'instruction': 'Какие сроки?', 'input': '', 'output': ['До 31 марта 2026 года', 'Иванова']}]
+    records = build_examples(document(), raw, 1800, 0.6, Counter())
+    assert records[0]['output'] == 'До 31 марта 2026 года; Иванова'

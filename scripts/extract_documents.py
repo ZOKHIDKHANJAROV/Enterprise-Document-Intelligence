@@ -31,6 +31,8 @@ from pptx import Presentation
 from pypdf import PdfReader
 from tqdm import tqdm
 
+from text_quality import fix_mojibake, text_quality
+
 SUPPORTED = {
     ".pdf",
     ".docx",
@@ -49,30 +51,6 @@ def sha256_file(path: Path) -> str:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
-
-
-def fix_mojibake(text: str) -> str:
-    """Repair cp1251 text that a PDF font mapped as cp1252 ("ÏËÀÑÒÈÍÛ" -> "ПЛАСТИНЫ")."""
-    latin = len(re.findall("[À-ÿ]", text))
-    if latin > 50 and latin > len(re.findall("[а-яА-ЯёЁ]", text)):
-        try:
-            return text.encode("cp1252").decode("cp1251")
-        except UnicodeError:
-            return text
-    return text
-
-
-def text_quality(text: str) -> float:
-    """Share of visible characters that belong to words of 3+ letters.
-
-    Readable documents score about 0.7-0.9. Broken text layers score low:
-    glyph codes ("/G01/G02"), OCR noise ("lI1l)"), control characters.
-    """
-    sample = text[:30000]
-    visible = len(re.sub(r"\s", "", sample))
-    if not visible:
-        return 0.0
-    return sum(len(word) for word in re.findall(r"[^\W\d_]{3,}", sample)) / visible
 
 
 def clean_text(text: str) -> str:

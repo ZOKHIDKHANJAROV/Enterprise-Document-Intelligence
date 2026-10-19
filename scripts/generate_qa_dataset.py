@@ -169,7 +169,10 @@ def build_examples(document, raw_examples, context_chars, min_grounding, stats):
         if not isinstance(example, dict):
             continue
         instruction = CATEGORY_PREFIX.sub('', str(example.get('instruction', '')).strip())
-        output = str(example.get('output', '')).strip()
+        output = example.get('output', '')
+        if isinstance(output, list):  # the model sometimes answers with a list
+            output = '; '.join(str(item).strip() for item in output if str(item).strip())
+        output = str(output).strip()
         if not instruction or not output:
             stats['empty'] += 1
             continue

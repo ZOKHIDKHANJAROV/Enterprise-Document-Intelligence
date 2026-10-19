@@ -40,7 +40,7 @@ qa-resume:
 	python scripts/generate_qa_dataset.py --input data/extracted/corpus.jsonl --output data/dataset/qa_raw.jsonl --base-url $(QA_URL) --model $(QA_MODEL) --max-documents 500 --resume
 
 validate:
-	python scripts/prepare_dataset.py --input data/dataset/qa_raw.jsonl --output data/dataset/qa_validated.jsonl
+	python scripts/prepare_dataset.py --input data/dataset/qa_raw.jsonl --output data/dataset/qa_validated.jsonl --max-noise 0.3
 
 split:
 	python scripts/split_dataset.py --input data/dataset/qa_validated.jsonl --output-dir data/dataset
