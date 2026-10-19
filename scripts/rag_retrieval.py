@@ -103,7 +103,8 @@ def reciprocal_rank_fusion(rankings, k=60, limit=None):
 # Neural models (torch imported lazily so BM25 works without it)
 
 class DenseEncoder:
-    def __init__(self, model_name=EMBEDDING_MODEL, max_length=1024, batch_size=16):
+    # Chunks are ~600 chars (well under 512 tokens); longer inputs are truncated.
+    def __init__(self, model_name=EMBEDDING_MODEL, max_length=512, batch_size=32):
         import torch
         from transformers import AutoModel, AutoTokenizer
 
@@ -120,16 +121,28 @@ class DenseEncoder:
         torch = self.torch
         if is_query:
             texts = [f'Instruct: {RETRIEVAL_TASK}\nQuery:{text}' for text in texts]
+        if not texts:
+            return np.zeros((0, 0), dtype='float32')
+        # Batch texts of similar length to minimise padding; restore order at the end.
+        order = sorted(range(len(texts)), key=lambda i: len(texts[i]))
         vectors = []
-        for start in range(0, len(texts), self.batch_size):
-            batch = self.tokenizer(texts[start:start + self.batch_size], padding=True, truncation=True,
+        starts = range(0, len(texts), self.batch_size)
+        if len(texts) > 1000:
+            from tqdm import tqdm
+
+            starts = tqdm(starts, desc='Embedding', unit='batch')
+        for start in starts:
+            batch_texts = [texts[i] for i in order[start:start + self.batch_size]]
+            batch = self.tokenizer(batch_texts, padding=True, truncation=True,
                                    max_length=self.max_length, return_tensors='pt').to(self.device)
             with torch.no_grad():
                 hidden = self.model(**batch).last_hidden_state
             # Left padding: the last position is always a real token.
             pooled = torch.nn.functional.normalize(hidden[:, -1].float(), p=2, dim=1)
             vectors.append(pooled.cpu().numpy())
-        return np.concatenate(vectors) if vectors else np.zeros((0, 0), dtype='float32')
+        result = np.empty((len(texts), vectors[0].shape[1]), dtype='float32')
+        result[order] = np.concatenate(vectors)
+        return result
 
 
 class Reranker:
