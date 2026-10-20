@@ -1,5 +1,5 @@
 # Main model: Qwen3 4B instruct (non-thinking 2507 release). Fits QLoRA on an
-# 8 GB GPU at max_seq_length 1536. Mistral 7B is kept in qlora_mistral.yaml.
+# 8 GB GPU at max_seq_length 1280. Mistral 7B is kept in qlora_mistral.yaml.
 model_name: "Qwen/Qwen3-4B-Instruct-2507"
 output_dir: "models/adapters/qwen3-4b-qlora"
 
@@ -37,5 +37,6 @@ training:
   warmup_ratio: 0.03
   lr_scheduler_type: "cosine"
   # Dense technical text is ~1.8 chars/token: at 1024 tokens 24% of examples
-  # (1800-char context + answer) did not fit; at 1536 about 1% are dropped.
-  max_seq_length: 1536
+  # (1800-char context + answer) did not fit, at 1280 6%, at 1536 1%. On an
+  # 8 GB GPU 1536 overflows into shared memory (19 -> 87 s/step), so 1280.
+  max_seq_length: 1280
