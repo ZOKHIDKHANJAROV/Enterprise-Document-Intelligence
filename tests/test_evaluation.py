@@ -148,7 +148,7 @@ def test_judge_main_writes_summary(tmp_path, monkeypatch):
              'reference': 'X', 'prediction': 'Y'}]
     predictions.write_text(''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in rows), encoding='utf-8')
 
-    def fake_judge(base_url, model, row, timeout, api_key=None):
+    def fake_judge(base_url, model, row, timeout, api_key=None, no_think=False):
         if row['document_id'] == 'doc-2':
             raise ValueError('bad json')
         return verdict(2)
@@ -162,3 +162,11 @@ def test_judge_main_writes_summary(tmp_path, monkeypatch):
     assert summary['judge_errors'] == 1
     assert summary['correctness'] == 1.0
     assert summary['judge_model'] == 'm'
+
+
+def test_judge_no_think_and_think_block():
+    row = {'instruction': 'Q', 'context': 'C', 'reference': 'R', 'prediction': 'P'}
+    assert build_judge_messages(row, no_think=True)[0]['content'].endswith('/no_think')
+    assert '/no_think' not in build_judge_messages(row)[0]['content']
+    verdict = parse_verdict('<think>\n\n</think>\n{"correctness": 1, "faithful": true, "refusal": false}')
+    assert verdict['correctness'] == 1

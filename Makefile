@@ -43,7 +43,7 @@ validate:
 	python scripts/prepare_dataset.py --input data/dataset/qa_raw.jsonl --output data/dataset/qa_validated.jsonl --max-noise 0.3
 
 split:
-	python scripts/split_dataset.py --input data/dataset/qa_validated.jsonl --output-dir data/dataset
+	python scripts/split_dataset.py --input data/dataset/qa_validated.jsonl --output-dir data/dataset --train-ratio 0.8 --validation-ratio 0.1
 
 unanswerable:
 	python scripts/add_unanswerable.py --dataset-dir data/dataset --ratio 0.1

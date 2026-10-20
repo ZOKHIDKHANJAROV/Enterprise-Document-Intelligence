@@ -8,6 +8,8 @@ max_documents: 500
 seed: 42
 
 # Dataset split is done by document_id to prevent document-level leakage.
-train_ratio: 0.90
-validation_ratio: 0.05
-test_ratio: 0.05
+# 80/10/10: with ~2k QA pairs a 5% test set (~100 questions) is too noisy
+# to compare base vs QLoRA.
+train_ratio: 0.80
+validation_ratio: 0.10
+test_ratio: 0.10

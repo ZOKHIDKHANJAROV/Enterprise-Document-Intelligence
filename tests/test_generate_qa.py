@@ -179,3 +179,8 @@ def test_list_answer_is_joined():
     raw = [{'instruction': 'Какие сроки?', 'input': '', 'output': ['До 31 марта 2026 года', 'Иванова']}]
     records = build_examples(document(), raw, 1800, 0.6, Counter())
     assert records[0]['output'] == 'До 31 марта 2026 года; Иванова'
+
+
+def test_parse_json_allows_raw_newlines_in_strings():
+    text = '[{"instruction": "Q", "input": "строка 1\nстрока 2", "output": "A"}]'
+    assert qa.parse_json(text)[0]['input'] == 'строка 1\nстрока 2'

@@ -203,10 +203,10 @@ def parse_json(text):
         raise ValueError('No JSON array in model response')
     payload = text[start:end + 1]
     try:
-        result = json.loads(payload)
+        result = json.loads(payload, strict=False)  # raw newlines inside strings
     except json.JSONDecodeError:
         # Models copy backslashes from documents ("\e", "\G"); escape invalid ones.
-        result = json.loads(re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', payload))
+        result = json.loads(re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', payload), strict=False)
     if not isinstance(result, list):
         raise ValueError('Expected JSON array')
     return result

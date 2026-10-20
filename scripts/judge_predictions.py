@@ -26,16 +26,18 @@ JUDGE_PROMPT = '''Ты строгий эксперт, проверяющий о�
 Верни только JSON-объект: {"correctness": 0|1|2, "faithful": true|false, "refusal": true|false, "comment": "кратко почему"}'''
 
 
-def build_judge_messages(row):
+def build_judge_messages(row, no_think=False):
     user = (f"ВОПРОС:\n{row['instruction']}\n\n"
             f"КОНТЕКСТ:\n{row.get('context') or '(нет)'}\n\n"
             f"ЭТАЛОННЫЙ ОТВЕТ:\n{row['reference']}\n\n"
             f"ОТВЕТ МОДЕЛИ:\n{row['prediction']}")
-    return [{'role': 'system', 'content': JUDGE_PROMPT}, {'role': 'user', 'content': user}]
+    # /no_think switches off reasoning in hybrid Qwen3 models used as judges.
+    system = JUDGE_PROMPT + ('\n/no_think' if no_think else '')
+    return [{'role': 'system', 'content': system}, {'role': 'user', 'content': user}]
 
 
 def parse_verdict(text):
-    text = (text or '').strip()
+    text = re.sub(r'<think>.*?</think>', '', text or '', flags=re.DOTALL).strip()
     start, end = text.find('{'), text.rfind('}')
     if start < 0 or end <= start:
         raise ValueError('No JSON object in judge response')
@@ -77,12 +79,12 @@ def aggregate(rows):
     }
 
 
-def judge(base_url, model, row, timeout, api_key=None):
+def judge(base_url, model, row, timeout, api_key=None, no_think=False):
     headers = {'Content-Type': 'application/json'}
     if api_key:
         headers['Authorization'] = f'Bearer {api_key}'
     response = requests.post(f"{base_url.rstrip('/')}/chat/completions", headers=headers,
-                             json={'model': model, 'temperature': 0, 'messages': build_judge_messages(row)},
+                             json={'model': model, 'temperature': 0, 'messages': build_judge_messages(row, no_think)},
                              timeout=timeout)
     response.raise_for_status()
     return parse_verdict(response.json()['choices'][0]['message']['content'])
@@ -96,6 +98,7 @@ def main():
     parser.add_argument('--model', required=True)
     parser.add_argument('--api-key-env', default=None, help='Name of the environment variable with the API key, if needed.')
     parser.add_argument('--timeout', type=int, default=120)
+    parser.add_argument('--no-think', action='store_true', help='Disable reasoning of hybrid Qwen3 judges.')
     args = parser.parse_args()
     api_key = os.environ.get(args.api_key_env) if args.api_key_env else None
 
@@ -106,7 +109,7 @@ def main():
 
     for row in tqdm(rows, desc='Judging'):
         try:
-            row['judge'] = judge(args.base_url, args.model, row, args.timeout, api_key)
+            row['judge'] = judge(args.base_url, args.model, row, args.timeout, api_key, args.no_think)
         except Exception as exc:
             print(f"WARNING: {row.get('document_id')}: {re.sub(r'\s+', ' ', str(exc))[:200]}")
 
