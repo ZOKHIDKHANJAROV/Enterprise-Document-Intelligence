@@ -31,10 +31,13 @@ training:
   fp16: false
   bf16: true
   logging_steps: 10
-  eval_steps: 100
-  save_steps: 100
+  # Frequent checkpoints so a paused run (--resume) loses little work.
+  eval_steps: 50
+  save_steps: 50
   save_total_limit: 2
   optim: "paged_adamw_8bit"
   warmup_ratio: 0.03
   lr_scheduler_type: "cosine"
-  max_seq_length: 1024
+  # Dense technical text is ~1.8 chars/token: at 1024 tokens 24% of examples
+  # (1800-char context + answer) did not fit; at 1536 about 1% are dropped.
+  max_seq_length: 1536

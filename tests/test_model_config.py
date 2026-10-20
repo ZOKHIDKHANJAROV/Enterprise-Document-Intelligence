@@ -115,3 +115,12 @@ def test_warmup_kwargs_supports_both_transformers_versions():
 
     assert warmup_kwargs(Old, 0.03) == {'warmup_ratio': 0.03}
     assert warmup_kwargs(New, 0.03) == {'warmup_steps': 0.03}
+
+
+def test_latest_checkpoint(tmp_path):
+    from train_qlora import latest_checkpoint
+
+    assert latest_checkpoint(tmp_path) is None
+    for step in (50, 100, 450):
+        (tmp_path / f'checkpoint-{step}').mkdir()
+    assert latest_checkpoint(tmp_path).endswith('checkpoint-450')

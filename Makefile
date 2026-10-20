@@ -56,7 +56,7 @@ format:
 	python scripts/format_sft_dataset.py --input data/dataset/validation.jsonl --output data/dataset/validation_sft.jsonl
 
 train:
-	python training/train_qlora.py --config $(CONFIG) --train data/dataset/train_sft.jsonl --validation data/dataset/validation_sft.jsonl
+	python training/train_qlora.py --config $(CONFIG) --train data/dataset/train_sft.jsonl --validation data/dataset/validation_sft.jsonl $(TRAIN_FLAGS)
 
 chat:
 	python inference/chat.py --config $(CONFIG) --with-adapter

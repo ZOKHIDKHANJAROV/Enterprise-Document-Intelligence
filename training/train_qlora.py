@@ -26,6 +26,12 @@ def warmup_kwargs(config_cls, ratio):
     return {'warmup_steps': ratio}
 
 
+def latest_checkpoint(output_dir):
+    """Path of the newest checkpoint-N folder, or None to start from scratch."""
+    checkpoints = sorted(Path(output_dir).glob('checkpoint-*'), key=lambda p: int(p.name.split('-')[-1]))
+    return str(checkpoints[-1]) if checkpoints else None
+
+
 def example_length(example, tokenizer):
     text = tokenizer.apply_chat_template(example['prompt'] + example['completion'], tokenize=False)
     return len(tokenizer(text, add_special_tokens=False)['input_ids'])
@@ -64,6 +70,7 @@ def main():
     parser.add_argument('--config', type=Path, default=Path('configs/qlora.yaml'))
     parser.add_argument('--train', type=Path, required=True)
     parser.add_argument('--validation', type=Path, required=True)
+    parser.add_argument('--resume', action='store_true', help='Continue from the last checkpoint in output_dir.')
     args = parser.parse_args()
 
     with args.config.open('r', encoding='utf-8') as handle:
@@ -99,7 +106,7 @@ def main():
     training_args = SFTConfig(output_dir=cfg['output_dir'], num_train_epochs=t['num_train_epochs'], per_device_train_batch_size=t['per_device_train_batch_size'], per_device_eval_batch_size=t['per_device_eval_batch_size'], gradient_accumulation_steps=t['gradient_accumulation_steps'], gradient_checkpointing=t['gradient_checkpointing'], learning_rate=t['learning_rate'], weight_decay=t['weight_decay'], fp16=t.get('fp16', False), bf16=t.get('bf16', False), logging_steps=t['logging_steps'], eval_strategy='steps', eval_steps=t['eval_steps'], save_strategy='steps', save_steps=t['save_steps'], save_total_limit=t['save_total_limit'], optim=t['optim'], **warmup_kwargs(SFTConfig, t['warmup_ratio']), lr_scheduler_type=t['lr_scheduler_type'], report_to='none', load_best_model_at_end=True, metric_for_best_model='eval_loss', greater_is_better=False, max_length=t['max_seq_length'], completion_only_loss=True)
 
     trainer = SFTTrainer(model=model, args=training_args, train_dataset=train_ds, eval_dataset=val_ds, processing_class=tokenizer, peft_config=peft_config)
-    trainer.train()
+    trainer.train(resume_from_checkpoint=latest_checkpoint(cfg['output_dir']) if args.resume else None)
     trainer.save_model(cfg['output_dir'])
     tokenizer.save_pretrained(cfg['output_dir'])
     print(f"Adapter saved to: {cfg['output_dir']}")
